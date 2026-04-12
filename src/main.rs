@@ -9,32 +9,46 @@ enum Operator {
     Div,
 }
 
-fn execute_cmd(cmd: Operator, stack: &mut Vec<f64>) {
+#[derive(Debug)]
+enum StackalcError {
+    EmptyStack,
+}
+
+fn execute_cmd(cmd: Operator, stack: &mut Vec<f64>) -> Result<(), StackalcError> {
+    let mut double_pop = || {
+        let arg2 = stack.pop().ok_or(StackalcError::EmptyStack)?;
+        let arg1 = stack.pop().ok_or(StackalcError::EmptyStack)?;
+
+        Ok((arg1, arg2))
+    };
+
     match cmd {
         Operator::Load(num) => {
             stack.push(num);
         }
         Operator::Neg => {
-            let popped = stack.pop().unwrap();
-            stack.push(-popped);
+            let arg = stack.pop().ok_or(StackalcError::EmptyStack)?;
+            stack.push(-arg);
         }
         Operator::Add => {
-            let (arg2, arg1) = (stack.pop().unwrap(), stack.pop().unwrap());
+            let (arg1, arg2) = double_pop()?;
             stack.push(arg1 + arg2);
         }
         Operator::Sub => {
-            let (arg2, arg1) = (stack.pop().unwrap(), stack.pop().unwrap());
+            let (arg1, arg2) = double_pop()?;
             stack.push(arg1 - arg2);
         }
         Operator::Mul => {
-            let (arg2, arg1) = (stack.pop().unwrap(), stack.pop().unwrap());
+            let (arg1, arg2) = double_pop()?;
             stack.push(arg1 * arg2);
         }
         Operator::Div => {
-            let (arg2, arg1) = (stack.pop().unwrap(), stack.pop().unwrap());
+            let (arg1, arg2) = double_pop()?;
             stack.push(arg1 / arg2); // puede paniquear
         }
-    }
+    };
+
+    Ok(())
 }
 
 fn parse_cmd(cmd: &str) -> Operator {
