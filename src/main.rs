@@ -44,7 +44,7 @@ fn execute_cmd(cmd: Operator, stack: &mut Vec<f64>) -> Result<(), StackalcError>
         }
         Operator::Div => {
             let (arg1, arg2) = double_pop()?;
-            stack.push(arg1 / arg2); // puede paniquear
+            stack.push(arg1 / arg2); // TODO da NaN. q hacemos?
         }
     };
 
@@ -76,7 +76,13 @@ fn main() {
         let line = buf.split_whitespace().map(|cmd| parse_cmd(cmd));
 
         for op in line {
-            execute_cmd(op, &mut stack);
+            match execute_cmd(op, &mut stack) {
+                Err(err) => {
+                    println!("[error] {:?}", err);
+                    break;
+                }
+                Ok(_) => {}
+            }
         }
 
         println!("{:#?}", stack);
