@@ -1,3 +1,24 @@
+// Prueba UT2
+// Mando todo el archivo
+// Nop:
+//  1. en parse_cmd, chequea que el parámetro sea "nop" y devuelve Operator::Nop
+//  2. cuando matchea en execute_cmd, no hace mada
+//
+// Ret:
+//  1. en parse_cmd, chequea que el parámetro sea "ret" y devuelve Operator::ret
+//  2. cuando matchea en execute_cmd, develve StackalcError::Halted
+//  3. en el bucle de ejecución de main, cada vez que recibe un error hace break (sin salir del
+//     bucle principal), imprimiendo el estado del stack y variables.
+//  Punto de mejora: en realidad Halted no tendría que ser un error, pero ya estaba casi todo el
+//  código hecho.
+//
+// Rng: NECESITA RAND (cargo add rand)
+//  1. en parse_cmd, chequea que el parámetro sea "ret" y devuelve Operator::Rng
+//  2. cuando matchea en execute_cmd, llama rand::rng().random::<f64>(), que por default devuelve
+//     entre [0, 1), y pushea el resultado.
+//
+
+use rand::prelude::*;
 use std::{collections::HashMap, io};
 
 enum Operator {
@@ -19,6 +40,11 @@ enum Operator {
     // vars
     Ldv(usize),
     Stv(usize),
+
+    // para la prueba
+    Nop,
+    Ret,
+    Rng,
 }
 
 #[derive(Debug)]
@@ -27,6 +53,7 @@ enum StackalcError {
     EmptyVariable,
     DivByZero,
     BadOperator,
+    Halted,
 }
 
 struct Interpreter {
@@ -145,6 +172,13 @@ fn execute_cmd(cmd: Operator, vm: &mut Interpreter) -> Result<(), StackalcError>
 
         Operator::Stv(idx) => vm.store(idx)?,
         Operator::Ldv(idx) => vm.load(idx)?,
+
+        Operator::Nop => {}
+        Operator::Ret => return Err(StackalcError::Halted),
+        Operator::Rng => {
+            let random = rand::rng().random::<f64>();
+            vm.push(random);
+        }
     };
 
     Ok(())
@@ -179,6 +213,9 @@ fn parse_cmd(cmd: &str) -> Result<Operator, StackalcError> {
             Ok(Operator::Stv(arg.parse::<usize>().unwrap()))
         }
 
+        "nop" => Ok(Operator::Nop),
+        "ret" => Ok(Operator::Ret),
+        "rng" => Ok(Operator::Rng),
         _ => Err(StackalcError::BadOperator),
     }
 }
