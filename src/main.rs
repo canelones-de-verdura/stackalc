@@ -1,23 +1,3 @@
-// Prueba UT2
-// Mando todo el archivo
-// Nop:
-//  1. en parse_cmd, chequea que el parámetro sea "nop" y devuelve Operator::Nop
-//  2. cuando matchea en execute_cmd, no hace mada
-//
-// Ret:
-//  1. en parse_cmd, chequea que el parámetro sea "ret" y devuelve Operator::ret
-//  2. cuando matchea en execute_cmd, develve StackalcError::Halted
-//  3. en el bucle de ejecución de main, cada vez que recibe un error hace break (sin salir del
-//     bucle principal), imprimiendo el estado del stack y variables.
-//  Punto de mejora: en realidad Halted no tendría que ser un error, pero ya estaba casi todo el
-//  código hecho.
-//
-// Rng: NECESITA RAND (cargo add rand)
-//  1. en parse_cmd, chequea que el parámetro sea "ret" y devuelve Operator::Rng
-//  2. cuando matchea en execute_cmd, llama rand::rng().random::<f64>(), que por default devuelve
-//     entre [0, 1), y pushea el resultado.
-//
-
 use rand::prelude::*;
 use std::{collections::HashMap, io};
 
@@ -41,6 +21,10 @@ enum Operator {
     Ldv(usize),
     Stv(usize),
 
+    // saltos
+    Br(usize),
+    BrCond(usize, bool),
+
     // para la prueba
     Nop,
     Ret,
@@ -57,6 +41,7 @@ enum StackalcError {
 }
 
 struct Interpreter {
+    ip: usize,
     stack: Vec<f64>,
     vars: HashMap<usize, f64>,
 }
@@ -64,6 +49,7 @@ struct Interpreter {
 impl Interpreter {
     fn new() -> Self {
         Self {
+            ip: 0,
             stack: Vec::<f64>::with_capacity(100),
             vars: HashMap::<usize, f64>::new(),
         }
@@ -107,81 +93,93 @@ impl Interpreter {
 
         Ok(())
     }
-}
 
-fn execute_cmd(cmd: Operator, vm: &mut Interpreter) -> Result<(), StackalcError> {
-    match cmd {
-        Operator::Load(num) => {
-            vm.push(num);
-        }
-        Operator::Neg => {
-            let arg = vm.pop()?;
-            vm.push(-arg);
-        }
-        Operator::Add => {
-            let (arg1, arg2) = vm.double_pop()?;
-            vm.push(arg1 + arg2);
-        }
-        Operator::Sub => {
-            let (arg1, arg2) = vm.double_pop()?;
-            vm.push(arg1 - arg2);
-        }
-        Operator::Mul => {
-            let (arg1, arg2) = vm.double_pop()?;
-            vm.push(arg1 * arg2);
-        }
-        Operator::Div => {
-            let (arg1, arg2) = vm.double_pop()?;
-            if arg2 == 0f64 {
-                return Err(StackalcError::DivByZero);
+    fn execute(&mut self, commands: Vec<Result<Operator, StackalcError>>) {}
+
+    fn execute_cmd(&mut self, cmd: &Operator) -> Result<(), StackalcError> {
+        self.ip += 1;
+        match cmd {
+            Operator::Load(num) => {
+                self.push(*num);
             }
-            vm.push(arg1 / arg2);
-        }
-        Operator::Dup => {
-            let arg = vm.peek()?;
-            vm.push(arg);
-        }
-        Operator::Pop => {
-            vm.pop()?;
-        }
-
-        Operator::Ceq => {
-            let (arg1, arg2) = vm.double_pop()?;
-            if arg1 == arg2 {
-                vm.push(1f64);
-            } else {
-                vm.push(0f64);
+            Operator::Neg => {
+                let arg = self.pop()?;
+                self.push(-arg);
             }
-        }
-        Operator::Cgt => {
-            let (arg1, arg2) = vm.double_pop()?;
-            if arg1 > arg2 {
-                vm.push(1f64);
-            } else {
-                vm.push(0f64);
+            Operator::Add => {
+                let (arg1, arg2) = self.double_pop()?;
+                self.push(arg1 + arg2);
             }
-        }
-        Operator::Clt => {
-            let (arg1, arg2) = vm.double_pop()?;
-            if arg1 < arg2 {
-                vm.push(1f64);
-            } else {
-                vm.push(0f64);
+            Operator::Sub => {
+                let (arg1, arg2) = self.double_pop()?;
+                self.push(arg1 - arg2);
             }
-        }
+            Operator::Mul => {
+                let (arg1, arg2) = self.double_pop()?;
+                self.push(arg1 * arg2);
+            }
+            Operator::Div => {
+                let (arg1, arg2) = self.double_pop()?;
+                if arg2 == 0f64 {
+                    return Err(StackalcError::DivByZero);
+                }
+                self.push(arg1 / arg2);
+            }
+            Operator::Dup => {
+                let arg = self.peek()?;
+                self.push(arg);
+            }
+            Operator::Pop => {
+                self.pop()?;
+            }
 
-        Operator::Stv(idx) => vm.store(idx)?,
-        Operator::Ldv(idx) => vm.load(idx)?,
+            Operator::Ceq => {
+                let (arg1, arg2) = self.double_pop()?;
+                if arg1 == arg2 {
+                    self.push(1f64);
+                } else {
+                    self.push(0f64);
+                }
+            }
+            Operator::Cgt => {
+                let (arg1, arg2) = self.double_pop()?;
+                if arg1 > arg2 {
+                    self.push(1f64);
+                } else {
+                    self.push(0f64);
+                }
+            }
+            Operator::Clt => {
+                let (arg1, arg2) = self.double_pop()?;
+                if arg1 < arg2 {
+                    self.push(1f64);
+                } else {
+                    self.push(0f64);
+                }
+            }
 
-        Operator::Nop => {}
-        Operator::Ret => return Err(StackalcError::Halted),
-        Operator::Rng => {
-            let random = rand::rng().random::<f64>();
-            vm.push(random);
-        }
-    };
+            Operator::Stv(idx) => self.store(*idx)?,
+            Operator::Ldv(idx) => self.load(*idx)?,
 
-    Ok(())
+            Operator::Br(idx) => self.ip = *idx,
+            Operator::BrCond(idx, cond) => {
+                let val = self.pop()?;
+                let val = val != 0f64;
+                if val == *cond {
+                    self.ip = *idx;
+                }
+            }
+
+            Operator::Nop => {}
+            Operator::Ret => return Err(StackalcError::Halted),
+            Operator::Rng => {
+                let random = rand::rng().random::<f64>();
+                self.push(random);
+            }
+        };
+
+        Ok(())
+    }
 }
 
 fn parse_cmd(cmd: &str) -> Result<Operator, StackalcError> {
@@ -213,6 +211,19 @@ fn parse_cmd(cmd: &str) -> Result<Operator, StackalcError> {
             Ok(Operator::Stv(arg.parse::<usize>().unwrap()))
         }
 
+        n if n.contains("brtrue") => {
+            let (_, arg) = n.split_once(":").unwrap();
+            Ok(Operator::BrCond(arg.parse::<usize>().unwrap(), true))
+        }
+        n if n.contains("brfalse") => {
+            let (_, arg) = n.split_once(":").unwrap();
+            Ok(Operator::BrCond(arg.parse::<usize>().unwrap(), false))
+        }
+        n if n.contains("br") => {
+            let (_, arg) = n.split_once(":").unwrap();
+            Ok(Operator::Br(arg.parse::<usize>().unwrap()))
+        }
+
         "nop" => Ok(Operator::Nop),
         "ret" => Ok(Operator::Ret),
         "rng" => Ok(Operator::Rng),
@@ -226,15 +237,15 @@ fn main() {
 
     loop {
         io::stdin().read_line(&mut buf).unwrap();
-        let line = buf.split_whitespace().map(|cmd| parse_cmd(cmd));
-        // .map(|op| {op.unwrap()});
+        let line: Vec<Result<Operator, StackalcError>> =
+            buf.split_whitespace().map(|cmd| parse_cmd(cmd)).collect();
 
-        for op in line {
-            match op {
+        while vm.ip != line.len() {
+            match &line[vm.ip] {
                 Err(err) => {
                     println!("[error] {:?}", err);
                 }
-                Ok(op) => match execute_cmd(op, &mut vm) {
+                Ok(op) => match vm.execute_cmd(op) {
                     Err(err) => {
                         println!("[error] {:?}", err);
                         break;
@@ -243,9 +254,11 @@ fn main() {
                 },
             }
         }
+        println!("STACK {:#?}", vm.stack);
+        println!("VARS {:#?}", vm.vars);
+        println!("IP {}", vm.ip);
 
-        println!("{:#?}", vm.stack);
-        println!("{:#?}", vm.vars);
+        vm.ip = 0;
 
         buf.clear();
     }
