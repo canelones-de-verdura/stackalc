@@ -31,7 +31,7 @@ enum Operator {
     Rng,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum StackalcError {
     EmptyStack,
     EmptyVariable,
@@ -229,38 +229,38 @@ fn parse_cmd(cmd: &str) -> Result<Operator, StackalcError> {
     }
 }
 
+fn run(buf: &str, vm: &mut Interpreter) -> Result<(), StackalcError> {
+    let line: Vec<Result<Operator, StackalcError>> =
+        buf.split_whitespace().map(|cmd| parse_cmd(cmd)).collect();
+
+    vm.ip = 0;
+    let len = line.len();
+    while vm.ip != len {
+        match &line[vm.ip] {
+            Err(err) => return Err(*err),
+            Ok(op) => vm.execute_cmd(op)?,
+        }
+
+        if vm.ip >= len {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
 fn main() {
     let mut vm = Interpreter::new();
     let mut buf = String::new();
 
     loop {
         io::stdin().read_line(&mut buf).unwrap();
-        let line: Vec<Result<Operator, StackalcError>> =
-            buf.split_whitespace().map(|cmd| parse_cmd(cmd)).collect();
-
-        let len = line.len();
-        while vm.ip != len {
-            match &line[vm.ip] {
-                Err(err) => {
-                    println!("[error] {:?}", err);
-                }
-                Ok(op) => match vm.execute_cmd(op) {
-                    Err(err) => {
-                        println!("[error] {:?}", err);
-                        break;
-                    }
-                    Ok(_) => {}
-                },
-            }
-
-            if vm.ip >= len {
-                break;
-            }
+        if let Err(err) = run(&buf, &mut vm) {
+            println!("[error] {:?}", err);
         }
+
         println!("STACK {:#?}", vm.stack);
         println!("VARS {:#?}", vm.vars);
-
-        vm.ip = 0;
 
         buf.clear();
     }
