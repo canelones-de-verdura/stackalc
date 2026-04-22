@@ -94,8 +94,6 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute(&mut self, commands: Vec<Result<Operator, StackalcError>>) {}
-
     fn execute_cmd(&mut self, cmd: &Operator) -> Result<(), StackalcError> {
         self.ip += 1;
         match cmd {
@@ -240,7 +238,8 @@ fn main() {
         let line: Vec<Result<Operator, StackalcError>> =
             buf.split_whitespace().map(|cmd| parse_cmd(cmd)).collect();
 
-        while vm.ip != line.len() {
+        let len = line.len();
+        while vm.ip != len {
             match &line[vm.ip] {
                 Err(err) => {
                     println!("[error] {:?}", err);
@@ -253,10 +252,13 @@ fn main() {
                     Ok(_) => {}
                 },
             }
+
+            if vm.ip >= len {
+                break;
+            }
         }
         println!("STACK {:#?}", vm.stack);
         println!("VARS {:#?}", vm.vars);
-        println!("IP {}", vm.ip);
 
         vm.ip = 0;
 
