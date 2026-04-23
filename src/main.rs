@@ -265,3 +265,95 @@ fn main() {
         buf.clear();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tests1() {
+        let test = |cmds: &str, stack: &[f64]| {
+            let mut vm = Interpreter::new();
+            let res = run(cmds, &mut vm);
+            assert!(res.is_ok());
+            assert_eq!(vm.stack, stack);
+        };
+
+        test("ldc:5 dup", &[5.0, 5.0]);
+        test("ldc:1 ldc:2 pop", &[1.0]);
+        test("ldc:5 ldc:3 cgt", &[1.0]);
+        test("ldc:3 ldc:5 cgt", &[0.0]);
+        test("ldc:3 ldc:5 ceq", &[0.0]);
+        test("ldc:3 ldc:3 ceq", &[1.0]);
+        test("ldc:2 ldc:8 clt", &[1.0]);
+        test("ldc:8 ldc:2 clt", &[0.0]);
+        test("ldc:7 dup pop", &[7.0]);
+        test("ldc:10 dup ldc:10 ceq", &[10.0, 1.0]);
+    }
+
+    #[test]
+    fn tests2() {
+        let test = |cmds: &str, stack: &[f64], vars: &[(usize, f64)]| {
+            let mut vm = Interpreter::new();
+            let res = run(cmds, &mut vm);
+            assert!(res.is_ok());
+            assert_eq!(vm.stack, stack);
+
+            let mut map = HashMap::new();
+            for var in vars {
+                map.insert(var.0, var.1);
+            }
+            assert_eq!(vm.vars, map);
+        };
+
+        test("ldc:42 stv:1", &[], &[(1, 42.0)]);
+        test("ldc:99 stv:0 ldv:0", &[99.0], &[(0, 99.0)]);
+        test("ldc:1 stv:2 ldc:5 stv:2 ldv:2", &[5.0], &[(2, 5.0)]);
+        test(
+            "ldc:10 stv:10 ldc:20 stv:20 ldv:10 ldv:20",
+            &[10.0, 20.0],
+            &[(10, 10.0), (20, 20.0)],
+        );
+        test(
+            "ldc:5 stv:1 ldc:3 stv:2 ldv:1 ldv:2 add",
+            &[8.0],
+            &[(1, 5.0), (2, 3.0)],
+        );
+        test("ldc:7 dup stv:5", &[7.0], &[(5, 7.0)]);
+        test("ldc:8 stv:3 ldv:3 ldv:3 add", &[16.0], &[(3, 8.0)]);
+        test("ldc:4 ldc:2 cgt stv:0", &[], &[(0, 1.0)]);
+        test("ldc:10 ldc:2 div stv:1", &[], &[(1, 5.0)]);
+        test(
+            "ldc:5 stv:1 ldv:1 ldv:1 mul stv:2 ldv:2",
+            &[25.0],
+            &[(1, 5.0), (2, 25.0)],
+        );
+    }
+
+    #[test]
+    fn tests3() {
+        let test = |cmds: &str, stack: &[f64], vars: &[(usize, f64)]| {
+            let mut vm = Interpreter::new();
+            let res = run(cmds, &mut vm);
+            assert!(res.is_ok());
+            assert_eq!(vm.stack, stack);
+
+            let mut map = HashMap::new();
+            for var in vars {
+                map.insert(var.0, var.1);
+            }
+            assert_eq!(vm.vars, map);
+        };
+
+        test("ldc:1 br:3 ldc:99 ldc:3", &[1.0, 3.0], &[]);
+        test("ldc:1 ldc:2 br:100 ldc:3", &[1.0, 2.0], &[]);
+        test("ldc:1 brtrue:3 ldc:99 ldc:5", &[5.0], &[]);
+        test("ldc:0 brtrue:3 ldc:99 ldc:5", &[99.0, 5.0], &[]);
+        test("ldc:0 brfalse:3 ldc:99 ldc:5", &[5.0], &[]);
+        test("ldc:1 brfalse:3 ldc:99 ldc:5", &[99.0, 5.0], &[]);
+        test("ldc:2 ldc:1 sub dup brtrue:1", &[0.0], &[]);
+        test("ldc:10 ldc:5 cgt brtrue:5 ldc:99 ldc:1", &[1.0], &[]);
+        test("ldc:5 ldc:10 cgt brfalse:5 ldc:99 ldc:1", &[1.0], &[]);
+        test("br:10 ldc:1 ldc:2 ldc:3 ldc:4", &[], &[]);
+    }
+}
